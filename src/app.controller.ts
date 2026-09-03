@@ -10,7 +10,7 @@ export class AppController {
     return "Delivery API";
   }
 
-  @Get('/health')
+  @Get('/healthcheck')
   health(): string {
     return this.appService.healthCheck();
   }
