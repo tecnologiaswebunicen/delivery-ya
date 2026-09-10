@@ -53,3 +53,4 @@ jobs:
     - run: npm run build --if-present
     - run: npm test
     - run: npm run test:e2e
+    - run: npm run test:cov

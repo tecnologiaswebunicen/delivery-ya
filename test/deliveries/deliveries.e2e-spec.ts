@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../../src/app.module.js';
@@ -14,6 +14,7 @@ describe('DeliveriesController (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
     await app.init();
   });
 
@@ -31,6 +32,17 @@ describe('DeliveriesController (e2e)', () => {
     expect(response.body).toMatchObject({
       status: DeliveryStatus.PENDING,
     });
+  });
+
+  it('/deliveries (POST) fails to create a delivery', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/deliveries')
+      .send({
+        trackingCode: `TRK-${Date.now()}`,
+        recipientName: 'John Doe',
+        destinationAddress: '456 Destination Ave',
+      })
+      .expect(400);
   });
 
   afterEach(async () => {
