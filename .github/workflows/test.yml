@@ -10,7 +10,7 @@ on:
     branches: [ "main" ]
 
 jobs:
-  build:
+  test:
 
     runs-on: ubuntu-latest
 
@@ -18,6 +18,29 @@ jobs:
       matrix:
         node-version: [24.x]
         # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
+
+    services:
+      postgres:
+        image: postgres:15.19
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: secret123
+          POSTGRES_DB: delivery_ya
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_USERNAME: postgres
+      DB_PASSWORD: secret123
+      DB_NAME: delivery_ya
+      DB_SYNCHRONIZE: true
 
     steps:
     - uses: actions/checkout@v4
