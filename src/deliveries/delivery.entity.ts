@@ -30,7 +30,7 @@ export class Delivery {
   @Column()
   destinationAddress: string;
 
-  @Column({ type: 'enum', enum: DeliveryStatus, default: DeliveryStatus.PENDING })
+  @Column({ type: 'enum', enum: DeliveryStatus})
   status: DeliveryStatus;
 
   @Column({ type: 'timestamptz', nullable: true })
