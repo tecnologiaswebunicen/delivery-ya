@@ -26,6 +26,7 @@ export class DeliveriesService {
   create(dto: CreateDeliveryDto): Promise<Delivery> {
     const delivery = this.deliveriesRepository.create({
       ...dto,
+      status: DeliveryStatus.PENDING,
       estimatedDeliveryAt: dto.estimatedDeliveryAt ? new Date(dto.estimatedDeliveryAt) : null,
     });
     return this.deliveriesRepository.save(delivery);
