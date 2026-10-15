@@ -7,7 +7,7 @@ export class AppController {
 
   @Get('')
   sayHello(): string {
-    return "Delivery API";
+    return "Delivery API 2.0";
   }
 
   @Get('/healthcheck')
