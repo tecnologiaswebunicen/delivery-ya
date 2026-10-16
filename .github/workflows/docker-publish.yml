@@ -64,6 +64,12 @@ jobs:
         uses: docker/metadata-action@96383f45573cb7f253c731d3b3ab81c87ef81934 # v5.0.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # Tags por defecto (rama / git tag) + un tag inmutable sha-<commit>,
+          # que es el que se despliega y permite hacer rollback a cualquier commit.
+          tags: |
+            type=ref,event=branch
+            type=ref,event=tag
+            type=sha,format=long
 
       # Build and push Docker image with Buildx (don't push on PR)
       # https://github.com/docker/build-push-action
@@ -93,12 +99,46 @@ jobs:
         # against the sigstore community Fulcio instance.
         run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
 
-       # Trigger deployment by calling the deploy webhook (main branch only)
-      - name: Trigger deploy
-        if: github.ref == 'refs/heads/main'
+  # Deploy por SSH: corre deploy.sh en el servidor con la imagen recién publicada.
+  # Solo en push a main (los tags semver publican imagen pero no despliegan).
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    # Aparece en la pestaña "Deployments" del repo; permite agregar
+    # aprobación manual desde Settings > Environments si algún día la querés.
+    environment: prod
+    # Nunca dos deploys a la vez; si llegan dos pushes seguidos, el segundo espera.
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+
+    steps:
+      - name: Configure SSH
         env:
-          DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_PASSPHRASE: ${{ secrets.SSH_PASSPHRASE }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
         run: |
-          curl --fail-with-body --silent --show-error \
-            --retry 3 --retry-delay 5 \
-            -X POST "$DEPLOY_URL"
+          # Si vienen vacíos, el "environment:" del job no coincide con el
+          # environment donde están cargados los secrets.
+          : "${SSH_KEY:?SSH_KEY vacío: revisá el nombre del environment}"
+          : "${SSH_PASSPHRASE:?SSH_PASSPHRASE vacío: revisá el nombre del environment}"
+
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          # Quita la passphrase de la copia en el runner (efímero), así ssh
+          # puede usarla sin prompt. Falla acá si la passphrase es incorrecta.
+          ssh-keygen -p -q -f ~/.ssh/deploy_key -P "$SSH_PASSPHRASE" -N ""
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Deploy
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          TAG: sha-${{ github.sha }}
+        # Ajustá la ruta si deploy.sh no está en ~/app
+        run: |
+          ssh -i ~/.ssh/deploy_key -o BatchMode=yes \
+            "$SSH_USER@$SSH_HOST" "~/apps/backend/deploy.sh $TAG"
