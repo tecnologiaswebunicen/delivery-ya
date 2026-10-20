@@ -124,6 +124,7 @@ jobs:
           # environment donde están cargados los secrets.
           : "${SSH_KEY:?SSH_KEY vacío: revisá el nombre del environment}"
           : "${SSH_PASSPHRASE:?SSH_PASSPHRASE vacío: revisá el nombre del environment}"
+          : "${SSH_KNOWN_HOSTS:?SSH_KNOWN_HOSTS vacío: cargalo con ssh-keyscan -H <host>}"
 
           install -m 700 -d ~/.ssh
           printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
