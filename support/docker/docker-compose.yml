@@ -1,0 +1,55 @@
+# Compose de producción: va en el servidor junto a deploy.sh (~/apps/backend).
+# Las credenciales salen del .env de ese directorio (ver .env.example).
+
+services:
+
+  app:
+    image: ghcr.io/tecnologiaswebunicen/delivery-ya:${APP_TAG:-main}
+    restart: unless-stopped
+    ports:
+      - 3000:3000
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USERNAME: postgres
+      DB_PASSWORD: ${DB_PASSWORD:?Falta DB_PASSWORD en .env}
+      DB_NAME: delivery_ya
+      DB_SYNCHRONIZE: true
+    healthcheck:
+      # La imagen es alpine: tiene wget (busybox) pero no curl.
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/healthcheck"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:15.19
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Falta DB_PASSWORD en .env}
+      POSTGRES_DB: delivery_ya
+    # Solo localhost: para acceder desde afuera usar un túnel SSH.
+    ports:
+      - 127.0.0.1:5432:5432
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d delivery_ya"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  adminer:
+    image: adminer
+    restart: unless-stopped
+    # Solo localhost: ssh -L 8080:localhost:8080 <user>@<host>
+    ports:
+      - 127.0.0.1:8080:8080
+
+volumes:
+  db_data:
