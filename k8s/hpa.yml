@@ -1,0 +1,31 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: delivery-ya-api
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: ReplicaSet
+    name: delivery-ya-api
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70   # % of the pod's CPU request (100m here, so 70m)
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Pods
+          value: 2                 # add at most 2 pods
+          periodSeconds: 30        # every 30s
+    scaleDown:
+      stabilizationWindowSeconds: 300   # wait for 5 min of lower load before removing pods
+      policies:
+        - type: Pods
+          value: 1                 # remove at most 1 pod
+          periodSeconds: 60        # every 60s
