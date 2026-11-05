@@ -1,0 +1,64 @@
+name: Deploy Render
+
+# Hace un GET a la URL cargada en el secret CALL_URL usando @actions/http-client
+# (https://github.com/actions/toolkit/tree/main/packages/http-client).
+# Falla si la respuesta no es 2xx.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  call:
+    runs-on: ubuntu-latest
+    permissions: {}
+
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+
+      # Se instala en un directorio temporal: no hace falta checkout ni tocar
+      # el package.json del proyecto.
+      - name: Install @actions/http-client
+        working-directory: ${{ runner.temp }}
+        run: |
+          npm init -y > /dev/null
+          npm install --no-audit --no-fund @actions/http-client@4
+
+      - name: Call URL
+        working-directory: ${{ runner.temp }}
+        env:
+          # Al venir de un secret, GitHub la enmascara en los logs.
+          DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
+        run: |
+          cat > call-url.mjs <<'EOF'
+          import { HttpClient } from '@actions/http-client';
+
+          const url = process.env.DEPLOY_URL;
+          if (!url) {
+            console.log('::error::DEPLOY_URL vacío: cargá el secret en el repo');
+            process.exit(1);
+          }
+
+          const client = new HttpClient('delivery-ya-call-url', [], {
+            allowRetries: true,
+            maxRetries: 3,
+            socketTimeout: 30_000,
+          });
+
+          try {
+            const res = await client.get(url);
+            const status = res.message.statusCode;
+            const body = await res.readBody();
+            console.log(`Status: ${status}`);
+            console.log(body);
+            if (status < 200 || status >= 300) {
+              console.log(`::error::La URL respondió ${status}`);
+              process.exit(1);
+            }
+          } catch (err) {
+            console.log(`::error::Falló el request: ${err.message}`);
+            process.exit(1);
+          }
+          EOF
+          node call-url.mjs
