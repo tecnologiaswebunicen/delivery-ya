@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: delivery-ya-api
+  labels:
+    app: delivery-ya-api
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: delivery-ya-api
+  template:
+    metadata:
+      labels:
+        app: delivery-ya-api
+    spec:
+      containers:
+        - name: api
+          # Imagen local: docker build -t delivery-ya:local .
+          image: delivery-ya:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3000
+          env:
+            # Postgres de docker-compose, corriendo en la máquina host (Docker Desktop).
+            - name: DB_HOST
+              value: host.docker.internal
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_USERNAME
+              value: postgres
+            - name: DB_PASSWORD
+              value: secret123
+            - name: DB_NAME
+              value: delivery_ya
+            - name: DB_SYNCHRONIZE
+              value: "true"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          # La app recién escucha cuando conectó a la base; TypeORM reintenta hasta ~30s.
+          startupProbe:
+            httpGet:
+              path: /healthcheck
+              port: http
+            periodSeconds: 3
+            failureThreshold: 20
+          readinessProbe:
+            httpGet:
+              path: /healthcheck
+              port: http
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthcheck
+              port: http
+            periodSeconds: 10
